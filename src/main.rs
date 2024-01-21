@@ -1,5 +1,5 @@
 use ark_ec::AffineRepr;
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField};
 use ark_mnt4_753::{Fr as MNT4BigFr, MNT4_753};
 use ark_mnt6_753::G1Affine;
 use ark_mnt6_753::{constraints::G1Var, Fr as MNT6BigFr};
@@ -7,7 +7,7 @@ use ark_mnt6_753::{constraints::G1Var, Fr as MNT6BigFr};
 use ark_crypto_primitives::merkle_tree::{Config, MerkleTree, Path};
 use ark_crypto_primitives::{crh::TwoToOneCRHScheme, snark::SNARK};
 use ark_groth16::Groth16;
-use ark_r1cs_std::fields::fp::FpVar;
+use ark_r1cs_std::fields::fp::FpVar; // prime field and fpVar represent variables corresponding to the field elements
 use ark_r1cs_std::prelude::*;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use ark_serialize::{CanonicalDeserialize, Read};
@@ -77,7 +77,7 @@ impl ConstraintSynthesizer<ConstraintF> for SpendCircuit {
     ) -> Result<(), SynthesisError> {
         // Allocate Merkle Tree Root
         let root = <LeafHG as CRHSchemeGadget<LeafH, _>>::OutputVar::new_input(
-            ark_relations::ns!(cs, "new_digest"),
+            ark_relations::ns!(cs, "new_digest"), // with ns! we are just allocating storage in the circuit
             || Ok(self.root),
         )?;
 
@@ -98,7 +98,7 @@ impl ConstraintSynthesizer<ConstraintF> for SpendCircuit {
         Boolean::enforce_smaller_or_equal_than_le(&secret_bits, MNT6BigFr::MODULUS)?;
 
         let nullifier = <LeafHG as CRHSchemeGadget<LeafH, _>>::OutputVar::new_input(
-            ark_relations::ns!(cs, "nullifier"),
+            ark_relations::ns!(cs, "nullifier"), // ye nullifier wo hai inputs se aaya hai
             || Ok(self.nullifier),
         )?;
 
@@ -142,6 +142,9 @@ fn main() {
     let rng = &mut ark_std::rand::rngs::StdRng::seed_from_u64(0u64);
 
     let leaves: Vec<Vec<MNT4BigFr>> = from_file("./leaves.bin");
+    // println!("Leaves: {:?}", leaves);
+    // only two leaves are there
+
     let leaked_secret: MNT4BigFr = from_file("./leaked_secret.bin");
     let (pk, vk): (
         <Groth16<MNT4_753> as SNARK<MNT4BigFr>>::ProvingKey,
@@ -149,8 +152,10 @@ fn main() {
     ) = from_file("./proof_keys.bin");
 
     let leaf_crh_params = poseidon_parameters::poseidon_parameters();
+    // println!("Leaves crh params: {:?}", leaf_crh_params);
     let i = 2;
     let two_to_one_crh_params = leaf_crh_params.clone();
+    // println!("Two to one crh params: {:?}", two_to_one_crh_params);
 
     let nullifier = <LeafH as CRHScheme>::evaluate(&leaf_crh_params, vec![leaked_secret]).unwrap();
 
@@ -186,12 +191,11 @@ fn main() {
 
     assert!(Groth16::<MNT4_753>::verify(&vk, &vec![root, nullifier], &proof).unwrap());
 
-    /* Enter your solution here */
-
-    let nullifier_hack = MNT4BigFr::from(0);
-    let secret_hack = MNT4BigFr::from(0);
-
-    /* End of solution */
+    let zero = MNT6BigFr::from(0);
+    let leaked_secret_mnt6: MNT6BigFr = from_file("./leaked_secret.bin");
+    let new_secret = MNT4BigFr::from((zero - leaked_secret_mnt6).into_bigint()); // taking additive inverse
+    let secret_hack = new_secret;
+    let nullifier_hack =  <LeafH as CRHScheme>::evaluate(&leaf_crh_params, vec![secret_hack]).unwrap();
 
     assert_ne!(nullifier, nullifier_hack);
 
