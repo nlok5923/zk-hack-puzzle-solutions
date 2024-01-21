@@ -152,10 +152,8 @@ fn main() {
     ) = from_file("./proof_keys.bin");
 
     let leaf_crh_params = poseidon_parameters::poseidon_parameters();
-    // println!("Leaves crh params: {:?}", leaf_crh_params);
     let i = 2;
     let two_to_one_crh_params = leaf_crh_params.clone();
-    // println!("Two to one crh params: {:?}", two_to_one_crh_params);
 
     let nullifier = <LeafH as CRHScheme>::evaluate(&leaf_crh_params, vec![leaked_secret]).unwrap();
 
